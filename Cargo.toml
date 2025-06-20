@@ -1,0 +1,18 @@
+[package]
+name = "restart-that-thang"
+version = "0.0.1"
+authors = ["Dylan Ullrich <dylan@eldyl.org>"]
+edition = "2024"
+
+[profile.release]
+strip = true
+
+[dependencies]
+anyhow = "1.0.98"
+chrono = { version = "0.4.41", features = ["serde"] }
+env_logger = "0.11.8"
+log = "0.4.27"
+petgraph = "0.8.2"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tokio = { version = "1.45.1", features = ["macros", "time", "rt-multi-thread", "process", "net", "io-util", "sync"] }

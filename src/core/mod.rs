@@ -57,7 +57,8 @@ impl Controller {
             .context("Failed to create string from docker output")?;
 
         if docker_output.is_empty() {
-            anyhow::bail!("No containers running on host");
+            log::warn!("No containers with restart-that-thang labels running on host");
+            return Ok(());
         }
 
         // Hold newly parsed containers with RTT labels
@@ -143,7 +144,8 @@ impl Controller {
     /// Use `docker inspect` to obtain container start time, and health state.
     pub(crate) async fn fetch_and_set_start_times(&mut self) -> anyhow::Result<()> {
         if self.containers.is_empty() {
-            anyhow::bail!("No containers running on host")
+            log::warn!("No containers with restart-that-thang labels running on host");
+            return Ok(());
         }
 
         let output = Command::new("docker")

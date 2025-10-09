@@ -5,4 +5,4 @@ pub mod startup;
 
 pub use configuration::Config;
 pub use core::Controller;
-pub use startup::run;
+pub use startup::{poll, Application};

@@ -1,3 +1,4 @@
+use crate::core::docker::{docker_restart_container, DockerError};
 use anyhow::Context;
 use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, Utc};
 
@@ -67,28 +68,8 @@ impl Container {
     }
 
     /// Restart container with the docker-cli.
-    pub(crate) async fn restart(&self) -> anyhow::Result<()> {
-        const CONTAINER_RESTART_TIMEOUT: u64 = 15;
-        log::info!("Restarting: {}", &self.name);
-
-        let output = tokio::time::timeout(
-            tokio::time::Duration::from_secs(CONTAINER_RESTART_TIMEOUT),
-            tokio::process::Command::new("docker")
-                .args(["restart", &self.name])
-                .output(),
-        )
-        .await
-        .context(format!("{} restart timed out", self.name))?
-        .context("Failed to restart container")?;
-
-        if output.status.success() {
-            log::info!("Success! ({})", self.name);
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("Failed to restart {}: {}", self.name, stderr);
-        }
-
-        Ok(())
+    pub(crate) async fn restart(&self) -> Result<(), DockerError> {
+        docker_restart_container(&self.name).await
     }
 
     /// Determines if a container needs to be restarted based on the next restart time that was

@@ -117,7 +117,7 @@ pub(crate) enum HealthState {
 
 impl HealthState {
     pub(crate) fn parse(field: &str) -> HealthState {
-        match field {
+        match field.to_lowercase().as_str() {
             "healthy" => HealthState::Healthy,
             "unhealthy" => HealthState::UnHealthy,
             "starting" => HealthState::Starting,

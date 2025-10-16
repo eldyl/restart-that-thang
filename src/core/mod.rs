@@ -52,7 +52,7 @@ impl Controller {
         let docker_output = docker_list_containers().await?;
 
         if docker_output.is_empty() {
-            log::warn!("No containers with restart-that-thang labels running on host");
+            log::warn!("No containers running on host");
             return Ok(());
         }
 

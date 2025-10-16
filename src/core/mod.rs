@@ -46,15 +46,7 @@ impl Controller {
     /// hashmap HashMap<ContainerName, Container>.
     pub(crate) async fn fetch_rtt_containers(&mut self) -> anyhow::Result<()> {
         // List docker containers in json format with docker-cli
-        let output = Command::new("docker")
-            .args(["ps", "-a", "--format", "json"])
-            .output()
-            .await
-            .context("Failed to call `docker ps -a --format json`")?;
-
-        // Create string from stdout
-        let docker_output = String::from_utf8(output.stdout)
-            .context("Failed to create string from docker output")?;
+        let docker_output = docker_list_containers().await?;
 
         if docker_output.is_empty() {
             log::warn!("No containers with restart-that-thang labels running on host");
@@ -148,17 +140,8 @@ impl Controller {
             return Ok(());
         }
 
-        let output = Command::new("docker")
-            .arg("inspect")
-            .arg("--format")
-            .arg("{{.Name}} {{.State.StartedAt}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}")
-            .args(&self.container_names)
-            .output()
-            .await
-            .context("Failed to inspect provided docker containers")?;
-
         let docker_output =
-            String::from_utf8(output.stdout).context("Failed to parse stdout into string")?;
+            docker_inspect_containers_health_and_start_time(&self.container_names).await?;
 
         docker_output
             .lines()

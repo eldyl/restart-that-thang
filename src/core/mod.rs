@@ -156,13 +156,17 @@ impl Controller {
                 // Set start time and health state for persisted containers
                 match parts.as_slice() {
                     [name, timestamp_str, health_state, ..] => {
-                        let timestamp = DateTime::parse_from_rfc3339(timestamp_str)
-                            .with_context(|| format!("Failed to parse timestamp for {name}"))?
-                            .with_timezone(&Utc);
+                        // Get the container that will have data included from docker inspect from
+                        // the containers that are presently being tracked
                         let container_to_update =
                             self.containers.get_mut(*name).with_context(|| {
                                 format!("Failed to get container {name} from hashmap")
                             })?;
+                        let timestamp = DateTime::parse_from_rfc3339(timestamp_str)
+                            .with_context(|| format!("Failed to parse timestamp for {name}"))?
+                            .with_timezone(&Utc);
+                        // Update the fields that were parsed from docker inspect for the container
+                        // we are tracking
                         container_to_update.set_health(health_state);
                         container_to_update.set_start_time(timestamp);
 

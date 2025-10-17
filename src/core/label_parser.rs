@@ -1,4 +1,4 @@
-use super::container::RestartSchedule;
+use super::schedule::{DailyTime, IntervalTime};
 use anyhow::Context;
 use chrono::NaiveTime;
 
@@ -27,8 +27,11 @@ pub struct RttLabels {
     /// Restart this container if a listed container becomes unhealthy.
     pub watch_unhealthy: Vec<ContainerName>,
 
-    /// Container has a time based restart schedule.
-    pub schedule: RestartSchedule,
+    // /// Container has a time based restart schedule.
+    // pub schedule: RestartSchedule,
+    pub interval_time: Option<IntervalTime>,
+
+    pub daily_time: Option<DailyTime>,
 }
 
 impl RttLabels {
@@ -43,14 +46,15 @@ impl RttLabels {
 
         let watch_unhealthy = Self::parse_watch_unhealthy(labels);
 
-        let schedule = Self::parse_schedule_interval(labels)
-            .or_else(|_| Self::parse_schedule_time(labels))
-            .unwrap_or(RestartSchedule::None);
+        let interval_time = Self::parse_schedule_interval_time(labels)?;
+
+        let daily_time = Self::parse_schedule_daily_time(labels)?;
 
         Ok(Some(Self {
             watch_restarted,
             watch_unhealthy,
-            schedule,
+            interval_time,
+            daily_time,
         }))
     }
 
@@ -85,7 +89,9 @@ impl RttLabels {
     }
 
     /// Parses the label used to set interval based restarts.
-    pub(crate) fn parse_schedule_interval(labels: &str) -> anyhow::Result<RestartSchedule> {
+    pub(crate) fn parse_schedule_interval_time(
+        labels: &str,
+    ) -> anyhow::Result<Option<IntervalTime>> {
         labels
             .split(RTT_SCHEDULE_INTERVAL)
             .nth(1)
@@ -97,12 +103,13 @@ impl RttLabels {
                     .join("")
             })
             .filter(|s| !s.is_empty())
-            .map(|schedule_str| -> anyhow::Result<RestartSchedule>{
+            .map(|schedule_str| -> anyhow::Result<IntervalTime>{
                 const HOURS_IN_DAY: u64 = 24;
                 const MINUTES_IN_HOUR: u64 = 60;
                 const SECONDS_IN_MINUTE: u64 = 60;
 
                 let duration_str = schedule_str.to_lowercase();
+
                 let total_seconds = if let Some(day_str) = duration_str.strip_suffix("d") {
                     let days: u64 = day_str.parse().context("Invalid format for days")?;
                     days * HOURS_IN_DAY * MINUTES_IN_HOUR * SECONDS_IN_MINUTE
@@ -116,18 +123,15 @@ impl RttLabels {
                     let secs: u64 = sec_str.parse().context("Invalid format for seconds")?;
                     secs
                 } else {
-                    log::error!("Invalid format for interval schedule. Use '1d', '12h', '90m', or  '30s'. Read: '{duration_str}'");
-                    return Ok(RestartSchedule::None);
+                    anyhow::bail!("Invalid format for interval schedule. Use '1d', '12h', '90m', or  '30s'. Read: '{duration_str}'");
                 };
 
-                Ok(RestartSchedule::Interval(tokio::time::Duration::from_secs(
-                            total_seconds,
-                )))
-            }).unwrap_or(Ok(RestartSchedule::None))
+                Ok(IntervalTime::from_secs(total_seconds))
+            }).transpose()
     }
 
     /// Parses the label for containers to be restarted at a specific time of day.
-    pub(crate) fn parse_schedule_time(labels: &str) -> anyhow::Result<RestartSchedule> {
+    pub(crate) fn parse_schedule_daily_time(labels: &str) -> anyhow::Result<Option<DailyTime>> {
         labels
             .split(RTT_SCHEDULE_TIME)
             .nth(1)
@@ -139,14 +143,14 @@ impl RttLabels {
                     .join("")
             })
             .filter(|s| !s.is_empty())
-            .map(|schedule_str| -> anyhow::Result<RestartSchedule> {
+            .map(|schedule_str| -> anyhow::Result<DailyTime> {
                 let time =
                     NaiveTime::parse_from_str(&schedule_str, "%H:%M").with_context(|| {
                         format!("Invalid time format: {schedule_str}. Use HH:MM format -> '23:00'")
                     })?;
 
-                Ok(RestartSchedule::DailyAt(time))
+                Ok(DailyTime::new(time))
             })
-            .unwrap_or(Ok(RestartSchedule::None))
+            .transpose()
     }
 }

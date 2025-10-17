@@ -3,15 +3,16 @@ use chrono::{DateTime, Utc};
 use petgraph::prelude::DiGraphMap;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use tokio::process::Command;
 
 mod container;
-use container::{Container, HealthState, RestartSchedule};
+use container::{Container, HealthState};
 mod docker;
 pub use docker::DockerError;
 use docker::{docker_inspect_containers_health_and_start_time, docker_list_containers};
 mod label_parser;
 use label_parser::RttLabels;
+mod schedule;
+use schedule::RestartSchedule;
 
 type ContainerName = String; // Using type to make purpose explicit
 
@@ -69,10 +70,18 @@ impl Controller {
                 }
             };
 
-            let Some(rtt_labels) = RttLabels::parse(&docker_container.labels)? else {
-                continue;
-            };
             let name = &docker_container.name;
+
+            let rtt_labels = match RttLabels::parse(&docker_container.labels) {
+                Ok(labels) => {
+                    let Some(labels) = labels else { continue };
+                    labels
+                }
+                Err(e) => {
+                    log::error!("Error while parsing labels for {name}: {e}");
+                    continue;
+                }
+            };
 
             log::debug!(
                 "{name} monitoring restarts of: {:?}",
@@ -82,30 +91,25 @@ impl Controller {
                 "{name} monitoring unhealthy state of: {:?}",
                 rtt_labels.watch_unhealthy
             );
-            log::debug!("{name} restart schedule: {:?}", &rtt_labels.schedule);
+            log::debug!(
+                "{name} restart interval time: {:?}",
+                &rtt_labels.interval_time
+            );
+            log::debug!("{name} restart daily time: {:?}", &rtt_labels.daily_time);
+
+            let schedule = RestartSchedule::new(rtt_labels.interval_time, rtt_labels.daily_time);
 
             // Determine containers schedule and next restart time
-            let (schedule, next_restart_time) = match rtt_labels.schedule {
-                // Container has no schedule
-                RestartSchedule::None => (None, None),
-                // Container has a schedule
-                schedule => {
-                    if let Some(existing) = self.containers.get(name) {
-                        // Container has been tracked previously
-                        if existing.restart_schedule == Some(schedule.clone()) {
-                            // Schedule remains the same, no need for recalculation
-                            (Some(schedule), existing.next_restart_time)
-                        } else {
-                            // Schedule changed, recalculate next start time
-                            let next_restart_time = self.calc_next_restart_time(&schedule)?;
-                            (Some(schedule), next_restart_time)
-                        }
-                    } else {
-                        // Container has not be previously tracked
-                        let next_restart_time = self.calc_next_restart_time(&schedule)?;
-                        (Some(schedule), next_restart_time)
-                    }
+            let next_restart_time = if let Some(schedule) = schedule.as_ref() {
+                if let Some(existing) = self.containers.get(name)
+                    && existing.restart_schedule == Some(schedule.clone())
+                {
+                    existing.next_restart_time
+                } else {
+                    schedule.calc_next_restart_time()?
                 }
+            } else {
+                None
             };
 
             log::debug!("{name} next restart time: {:?}", &next_restart_time);
@@ -126,14 +130,6 @@ impl Controller {
         self.containers = temp_containers;
 
         Ok(())
-    }
-
-    /// Calculates the next restart time for a container that has a schedule label.
-    fn calc_next_restart_time(
-        &self,
-        schedule: &RestartSchedule,
-    ) -> anyhow::Result<Option<DateTime<Utc>>> {
-        schedule.calc_next_restart_time()
     }
 
     /// Use `docker inspect` to obtain container start time, and health state.
@@ -303,8 +299,6 @@ impl Controller {
                                 e
                             );
                         }
-
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                     }
                     Err(e) => {
                         log::error!("{e}");

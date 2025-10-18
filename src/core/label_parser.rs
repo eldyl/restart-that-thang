@@ -27,10 +27,10 @@ pub struct RttLabels {
     /// Restart this container if a listed container becomes unhealthy.
     pub watch_unhealthy: Vec<ContainerName>,
 
-    // /// Container has a time based restart schedule.
-    // pub schedule: RestartSchedule,
+    /// The container will restart every time this interval of time has passed.
     pub interval_time: Option<IntervalTime>,
 
+    /// The container will restart at this time every day.
     pub daily_time: Option<DailyTime>,
 }
 

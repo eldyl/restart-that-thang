@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use petgraph::prelude::DiGraphMap;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use thiserror::Error;
 
 mod container;
 use container::{Container, HealthState};
@@ -15,6 +16,14 @@ mod schedule;
 use schedule::RestartSchedule;
 
 type ContainerName = String; // Using type to make purpose explicit
+
+#[derive(Debug, Error)]
+pub enum ControllerError {
+    #[error("No containers running on host machine")]
+    NoContainersRunningOnHost,
+    #[error("No containers with restart-that-thang labels running on host machine")]
+    NoRTTLabelsDetected,
+}
 
 /// Deserialized JSON output from `docker ps` command.
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -53,8 +62,7 @@ impl Controller {
         let docker_output = docker_list_containers().await?;
 
         if docker_output.is_empty() {
-            log::warn!("No containers running on host");
-            return Ok(());
+            anyhow::bail!(ControllerError::NoContainersRunningOnHost)
         }
 
         // Hold newly parsed containers with RTT labels
@@ -126,6 +134,10 @@ impl Controller {
             self.container_names.push(name.to_string());
         }
 
+        if temp_containers.is_empty() {
+            anyhow::bail!(ControllerError::NoRTTLabelsDetected)
+        }
+
         // Store containers in persistent hashmap
         self.containers = temp_containers;
 
@@ -135,8 +147,7 @@ impl Controller {
     /// Use `docker inspect` to obtain container start time, and health state.
     pub(crate) async fn fetch_and_set_start_times(&mut self) -> anyhow::Result<()> {
         if self.containers.is_empty() {
-            log::warn!("No containers with restart-that-thang labels running on host");
-            return Ok(());
+            anyhow::bail!(ControllerError::NoRTTLabelsDetected)
         }
 
         let docker_output =

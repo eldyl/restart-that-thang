@@ -59,8 +59,14 @@ impl Application {
 
 /// Core logic that runs during each cycle.
 pub async fn poll(controller: &mut Controller) -> anyhow::Result<()> {
-    controller.fetch_rtt_containers().await?;
-    controller.fetch_and_set_start_times().await?;
+    if let Err(e) = controller.fetch_rtt_containers().await {
+        log::warn!("{e}");
+        return Ok(());
+    };
+    if let Err(e) = controller.fetch_and_set_start_times().await {
+        log::warn!("{e}");
+        return Ok(());
+    };
     controller.sort()?;
     controller.restart_if_needed().await?;
     controller.cleanup_after_cycle();

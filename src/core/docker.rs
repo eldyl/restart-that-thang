@@ -41,7 +41,7 @@ pub enum DockerError {
 
 pub async fn docker_list_containers() -> Result<String, DockerError> {
     let output = Command::new("docker")
-        .args(["ps", "-a", "--format", "json"])
+        .args(["ps", "--format", "json"])
         .output()
         .await
         .map_err(|source| DockerError::DockerPsFailed { source })?;

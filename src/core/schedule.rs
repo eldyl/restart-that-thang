@@ -1,16 +1,17 @@
 use anyhow::Context;
 use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, Utc};
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IntervalTime(tokio::time::Duration);
+pub struct IntervalTime(Duration);
 
 impl IntervalTime {
-    pub fn new(duration: tokio::time::Duration) -> Self {
+    pub fn new(duration: Duration) -> Self {
         Self(duration)
     }
 
     pub fn from_secs(secs: u64) -> Self {
-        let duration = tokio::time::Duration::from_secs(secs);
+        let duration = Duration::from_secs(secs);
         Self::new(duration)
     }
 
@@ -22,8 +23,8 @@ impl IntervalTime {
     }
 }
 
-impl AsRef<tokio::time::Duration> for IntervalTime {
-    fn as_ref(&self) -> &tokio::time::Duration {
+impl AsRef<Duration> for IntervalTime {
+    fn as_ref(&self) -> &Duration {
         &self.0
     }
 }

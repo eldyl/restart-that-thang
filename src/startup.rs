@@ -2,6 +2,7 @@ use crate::routes::health;
 use crate::Config;
 use crate::Controller;
 use anyhow::Context;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::time::interval;
 
@@ -43,9 +44,9 @@ impl Application {
         self.spawn_health_check_endpoint().await?;
 
         // Initial startup delay before loop cycle starts
-        tokio::time::sleep(tokio::time::Duration::from_secs(self.startup_delay)).await;
+        tokio::time::sleep(Duration::from_secs(self.startup_delay)).await;
 
-        let mut interval_timer = interval(tokio::time::Duration::from_secs(self.polling_interval));
+        let mut interval_timer = interval(Duration::from_secs(self.polling_interval));
 
         let mut controller = self.controller;
         loop {

@@ -1,3 +1,4 @@
+use std::time::Duration;
 use thiserror::Error;
 use tokio::process::Command;
 
@@ -73,7 +74,7 @@ pub async fn docker_restart_container(container_name: &str) -> Result<(), Docker
     log::info!("Restarting: {container_name}");
 
     let output = tokio::time::timeout(
-        tokio::time::Duration::from_secs(CONTAINER_RESTART_TIMEOUT),
+        Duration::from_secs(CONTAINER_RESTART_TIMEOUT),
         tokio::process::Command::new("docker")
             .args(["restart", container_name])
             .output(),

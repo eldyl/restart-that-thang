@@ -1,9 +1,11 @@
 use super::schedule::RestartSchedule;
 use chrono::{DateTime, Utc};
 
-mod container_name;
+mod health;
+mod name;
 
-pub use container_name::ContainerName;
+pub use health::HealthState;
+pub use name::ContainerName;
 
 /// Holds required information for docker containers with RTT labels.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -81,26 +83,6 @@ impl Container {
             Utc::now() >= next_restart_time
         } else {
             false
-        }
-    }
-}
-
-/// Represents the possible health states of a container.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum HealthState {
-    Healthy,
-    UnHealthy,
-    Starting,
-    None,
-}
-
-impl HealthState {
-    pub(crate) fn parse(field: &str) -> HealthState {
-        match field.to_lowercase().as_str() {
-            "healthy" => HealthState::Healthy,
-            "unhealthy" => HealthState::UnHealthy,
-            "starting" => HealthState::Starting,
-            _ => HealthState::None,
         }
     }
 }

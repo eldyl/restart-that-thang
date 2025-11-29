@@ -1,3 +1,4 @@
+use crate::core::ContainerName;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::process::Command;
@@ -18,21 +19,21 @@ pub enum DockerError {
 
     #[error("Failed to restart docker container `{container_name}` due to timeout")]
     DockerRestartTimeout {
-        container_name: String,
+        container_name: ContainerName,
         #[source]
         source: tokio::time::error::Elapsed,
     },
 
     #[error("Failed to restart docker container `{container_name}`")]
     DockerRestartFailed {
-        container_name: String,
+        container_name: ContainerName,
         #[source]
         source: std::io::Error,
     },
 
     #[error("Failed to restart docker container `{container_name}`: {stderr}")]
     DockerRestartExitCode {
-        container_name: String,
+        container_name: ContainerName,
         stderr: String,
     },
 
@@ -53,7 +54,7 @@ pub async fn docker_list_containers() -> Result<String, DockerError> {
 }
 
 pub async fn docker_inspect_containers_health_and_start_time(
-    containers: &[String],
+    containers: &[ContainerName],
 ) -> Result<String, DockerError> {
     let output = Command::new("docker")
             .arg("inspect")
@@ -69,23 +70,24 @@ pub async fn docker_inspect_containers_health_and_start_time(
     Ok(docker_output)
 }
 
-pub async fn docker_restart_container(container_name: &str) -> Result<(), DockerError> {
+pub async fn docker_restart_container(container_name: &ContainerName) -> Result<(), DockerError> {
     const CONTAINER_RESTART_TIMEOUT: u64 = 15;
     log::info!("Restarting: {container_name}");
 
     let output = tokio::time::timeout(
         Duration::from_secs(CONTAINER_RESTART_TIMEOUT),
         tokio::process::Command::new("docker")
-            .args(["restart", container_name])
+            .arg("restart")
+            .arg(container_name)
             .output(),
     )
     .await
     .map_err(|source| DockerError::DockerRestartTimeout {
-        container_name: container_name.into(),
+        container_name: container_name.clone(),
         source,
     })?
     .map_err(|source| DockerError::DockerRestartFailed {
-        container_name: container_name.into(),
+        container_name: container_name.clone(),
         source,
     })?;
 
@@ -94,7 +96,7 @@ pub async fn docker_restart_container(container_name: &str) -> Result<(), Docker
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(DockerError::DockerRestartExitCode {
-            container_name: container_name.into(),
+            container_name: container_name.clone(),
             stderr: stderr.into(),
         });
     }

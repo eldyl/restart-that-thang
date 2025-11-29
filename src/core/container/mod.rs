@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 mod health;
 mod name;
 
-pub use health::HealthState;
+pub use health::ContainerHealth;
 pub use name::ContainerName;
 
 /// Holds required information for docker containers with RTT labels.
@@ -14,7 +14,7 @@ pub struct Container {
     pub(crate) name: ContainerName,
 
     /// The health state of the container.
-    pub(crate) health: HealthState,
+    pub(crate) health: ContainerHealth,
 
     /// Containers that this container depends on.
     pub(crate) depends_on: Vec<ContainerName>,
@@ -42,7 +42,7 @@ impl Container {
     ) -> Self {
         Self {
             name: name.into(),
-            health: HealthState::None,
+            health: ContainerHealth::None,
             depends_on,
             depends_on_healthy,
             start_time: None,
@@ -53,7 +53,7 @@ impl Container {
 
     /// Sets the health state of the container.
     pub(crate) fn set_health(&mut self, field: &str) {
-        self.health = HealthState::parse(field);
+        self.health = ContainerHealth::parse(field);
     }
 
     /// Sets the start time of the container which is parsed from docker-cli output.

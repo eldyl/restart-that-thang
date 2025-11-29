@@ -1,19 +1,19 @@
 /// Represents the possible health states of a container.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum HealthState {
+pub enum ContainerHealth {
     Healthy,
     UnHealthy,
     Starting,
     None,
 }
 
-impl HealthState {
-    pub(crate) fn parse(field: &str) -> HealthState {
+impl ContainerHealth {
+    pub(crate) fn parse(field: &str) -> ContainerHealth {
         match field.to_lowercase().as_str() {
-            "healthy" => HealthState::Healthy,
-            "unhealthy" => HealthState::UnHealthy,
-            "starting" => HealthState::Starting,
-            _ => HealthState::None,
+            "healthy" => ContainerHealth::Healthy,
+            "unhealthy" => ContainerHealth::UnHealthy,
+            "starting" => ContainerHealth::Starting,
+            _ => ContainerHealth::None,
         }
     }
 }

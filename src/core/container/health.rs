@@ -8,7 +8,7 @@ pub enum ContainerHealth {
 }
 
 impl ContainerHealth {
-    pub(crate) fn parse(field: &str) -> ContainerHealth {
+    pub(crate) fn new(field: &str) -> ContainerHealth {
         match field.to_lowercase().as_str() {
             "healthy" => ContainerHealth::Healthy,
             "unhealthy" => ContainerHealth::UnHealthy,

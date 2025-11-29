@@ -53,7 +53,7 @@ impl Container {
 
     /// Sets the health state of the container.
     pub(crate) fn set_health(&mut self, field: &str) {
-        self.health = ContainerHealth::parse(field);
+        self.health = ContainerHealth::new(field);
     }
 
     /// Sets the start time of the container which is parsed from docker-cli output.

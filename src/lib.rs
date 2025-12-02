@@ -4,5 +4,6 @@ pub mod routes;
 pub mod startup;
 
 pub use configuration::Config;
-pub use core::Controller;
-pub use startup::{poll, Application};
+pub use core::State;
+pub use startup::Application;
+

@@ -35,32 +35,13 @@ struct DockerPsOutput {
     labels: String,
 }
 
-/// Serves as controller for the program to be used to monitor labels and restart specific
-/// containers when appropriate.
+type RttCache = HashMap<ContainerName, Container>;
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Controller {
-    /// Hashmap persists through cycles to keep state of monitored containers
-    containers: HashMap<ContainerName, Container>,
-
-    /// Field gets used for the inspect command passed to the docker-cli. Creating this vector is
-    /// more efficient in terms of time than creating a vector from the containers keys to pass to
-    /// the docker-cli.
-    container_names: Vec<ContainerName>,
-
-    /// Containers that are sorted by their dependency position in the dependency graph.
-    sorted_containers: Vec<Container>,
+pub struct State {
+    pub containers: RttCache,
 }
 
-impl Controller {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Fetches containers with `docker ps`, parses containers with RTT labels, and creates a
-    /// hashmap HashMap<ContainerName, Container>.
-    pub(crate) async fn fetch_rtt_containers(&mut self) -> anyhow::Result<()> {
-        // List docker containers in json format with docker-cli
-        let docker_output = docker_list_containers().await?;
 
         if docker_output.is_empty() {
             anyhow::bail!(ControllerError::NoContainersRunningOnHost)

@@ -1,6 +1,9 @@
+use crate::core::{
+    fetch_and_set_start_times, fetch_rtt_containers, restart_if_needed, rtt_containers_topo_sort,
+};
 use crate::routes::health;
 use crate::Config;
-use crate::Controller;
+use crate::State;
 use anyhow::Context;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -11,7 +14,7 @@ pub struct Application {
     port: String,
     startup_delay: u64,
     polling_interval: u64,
-    pub controller: Controller,
+    pub state: State,
 }
 
 impl Application {
@@ -21,7 +24,7 @@ impl Application {
             port: config.port,
             startup_delay: config.startup_delay,
             polling_interval: config.polling_interval,
-            controller: Controller::new(),
+            state: State::default(),
         })
     }
 
@@ -48,10 +51,10 @@ impl Application {
 
         let mut interval_timer = interval(Duration::from_secs(self.polling_interval));
 
-        let mut controller = self.controller;
+        let mut state = self.state;
         loop {
             interval_timer.tick().await;
-            if let Err(e) = poll(&mut controller).await {
+            if let Err(e) = poll(&mut state).await {
                 log::error!("{e}")
             }
         }
@@ -59,17 +62,27 @@ impl Application {
 }
 
 /// Core logic that runs during each cycle.
-pub async fn poll(controller: &mut Controller) -> anyhow::Result<()> {
-    if let Err(e) = controller.fetch_rtt_containers().await {
-        log::warn!("{e}");
-        return Ok(());
+pub async fn poll(app_state: &mut State) -> anyhow::Result<()> {
+    let (container_names, containers) = match fetch_rtt_containers(app_state).await {
+        Ok((container_names, containers)) => (container_names, containers),
+        Err(e) => {
+            log::warn!("{e}");
+            return Ok(());
+        }
     };
-    if let Err(e) = controller.fetch_and_set_start_times().await {
-        log::warn!("{e}");
-        return Ok(());
+
+    let containers = match fetch_and_set_start_times(container_names, containers).await {
+        Ok(containers) => containers,
+        Err(e) => {
+            log::warn!("{e}");
+            return Ok(());
+        }
     };
-    controller.sort()?;
-    controller.restart_if_needed().await?;
-    controller.cleanup_after_cycle();
+
+    let sorted_container_names = rtt_containers_topo_sort(&containers)?;
+    let containers = restart_if_needed(containers, &sorted_container_names).await?;
+
+    app_state.containers = containers;
+
     Ok(())
 }

@@ -1,6 +1,8 @@
-use super::schedule::{DailyTime, IntervalTime};
+use super::schedule::{ScheduleDaily, ScheduleInterval};
+use super::ContainerName;
 use anyhow::Context;
 use chrono::NaiveTime;
+use thiserror::Error;
 
 // RTT label strings to be parsed from container labels
 // Short form
@@ -16,7 +18,9 @@ const RTT_WATCH_UNHEALTHY_LONG: &str = "restart-that-thang.watch.unhealthy=";
 const RTT_SCHEDULE_INTERVAL_LONG: &str = "restart-that-thang.schedule.interval=";
 const RTT_SCHEDULE_TIME_LONG: &str = "restart-that-thang.schedule.time=";
 
-type ContainerName = String;
+// TODO: Determine what error types I want to include
+#[derive(Debug, Error)]
+pub enum LabelParsingError {}
 
 /// The various label values that will be parsed for containers monitored by RTT.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,10 +32,10 @@ pub struct RttLabels {
     pub watch_unhealthy: Vec<ContainerName>,
 
     /// The container will restart every time this interval of time has passed.
-    pub interval_time: Option<IntervalTime>,
+    pub interval_time: Option<ScheduleInterval>,
 
     /// The container will restart at this time every day.
-    pub daily_time: Option<DailyTime>,
+    pub daily_time: Option<ScheduleDaily>,
 }
 
 impl RttLabels {
@@ -59,7 +63,7 @@ impl RttLabels {
     }
 
     /// Parses label that indicates which containers should be monitored for restarts
-    pub(crate) fn parse_watch_restarted(labels: &str) -> Vec<String> {
+    pub(crate) fn parse_watch_restarted(labels: &str) -> Vec<ContainerName> {
         labels
             .split(RTT_WATCH_RESTARTS)
             .nth(1)
@@ -67,14 +71,14 @@ impl RttLabels {
             .map(|part| {
                 part.split(",")
                     .take_while(|s| !s.trim().contains("="))
-                    .map(String::from)
+                    .map(ContainerName::from)
                     .collect()
             })
             .unwrap_or_default()
     }
 
     /// Parses label that indicates which containers should be monitored for unhealthy state
-    pub(crate) fn parse_watch_unhealthy(labels: &str) -> Vec<String> {
+    pub(crate) fn parse_watch_unhealthy(labels: &str) -> Vec<ContainerName> {
         labels
             .split(RTT_WATCH_UNHEALTHY)
             .nth(1)
@@ -82,7 +86,7 @@ impl RttLabels {
             .map(|part| {
                 part.split(",")
                     .take_while(|s| !s.trim().contains("="))
-                    .map(String::from)
+                    .map(ContainerName::from)
                     .collect()
             })
             .unwrap_or_default()
@@ -91,7 +95,7 @@ impl RttLabels {
     /// Parses the label used to set interval based restarts.
     pub(crate) fn parse_schedule_interval_time(
         labels: &str,
-    ) -> anyhow::Result<Option<IntervalTime>> {
+    ) -> anyhow::Result<Option<ScheduleInterval>> {
         labels
             .split(RTT_SCHEDULE_INTERVAL)
             .nth(1)
@@ -103,7 +107,7 @@ impl RttLabels {
                     .join("")
             })
             .filter(|s| !s.is_empty())
-            .map(|schedule_str| -> anyhow::Result<IntervalTime>{
+            .map(|schedule_str| -> anyhow::Result<ScheduleInterval>{
                 const HOURS_IN_DAY: u64 = 24;
                 const MINUTES_IN_HOUR: u64 = 60;
                 const SECONDS_IN_MINUTE: u64 = 60;
@@ -126,12 +130,12 @@ impl RttLabels {
                     anyhow::bail!("Invalid format for interval schedule. Use '1d', '12h', '90m', or  '30s'. Read: '{duration_str}'");
                 };
 
-                Ok(IntervalTime::from_secs(total_seconds))
+                Ok(ScheduleInterval::from_secs(total_seconds))
             }).transpose()
     }
 
     /// Parses the label for containers to be restarted at a specific time of day.
-    pub(crate) fn parse_schedule_daily_time(labels: &str) -> anyhow::Result<Option<DailyTime>> {
+    pub(crate) fn parse_schedule_daily_time(labels: &str) -> anyhow::Result<Option<ScheduleDaily>> {
         labels
             .split(RTT_SCHEDULE_TIME)
             .nth(1)
@@ -143,14 +147,18 @@ impl RttLabels {
                     .join("")
             })
             .filter(|s| !s.is_empty())
-            .map(|schedule_str| -> anyhow::Result<DailyTime> {
+            .map(|schedule_str| -> anyhow::Result<ScheduleDaily> {
                 let time =
                     NaiveTime::parse_from_str(&schedule_str, "%H:%M").with_context(|| {
                         format!("Invalid time format: {schedule_str}. Use HH:MM format -> '23:00'")
                     })?;
 
-                Ok(DailyTime::new(time))
+                Ok(ScheduleDaily::new(time))
             })
             .transpose()
     }
+}
+
+#[cfg(test)]
+mod tests {
 }

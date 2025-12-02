@@ -6,16 +6,17 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 mod container;
-use container::{Container, HealthState};
 mod docker;
-pub use docker::DockerError;
-use docker::{docker_inspect_containers_health_and_start_time, docker_list_containers};
 mod label_parser;
-use label_parser::RttLabels;
 mod schedule;
-use schedule::RestartSchedule;
 
-type ContainerName = String; // Using type to make purpose explicit
+use container::{Container, ContainerHealth, ContainerName};
+use docker::{
+    docker_inspect_containers_health_and_start_time, docker_list_containers,
+    docker_restart_container,
+};
+use label_parser::RttLabels;
+use schedule::RestartSchedule;
 
 #[derive(Debug, Error)]
 pub enum ControllerError {
